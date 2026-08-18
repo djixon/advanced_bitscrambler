@@ -1,0 +1,89 @@
+# assembly coded by Srdjan Crnjanski 2026 v1.0
+# all rights reserved
+# to use the code for free you must leave all the comments AS IS, including author name, year and the version
+#############################################################################################################
+
+cfg prefetch true
+cfg trailing_bytes 8
+    
+_start_interleave_preparation:
+# single bundle init
+     set 16..31 L, set 15 15, set 14 7, set 13 14, set 12 6, 
+     set 11 13, set 10 5, set 9 12, set 8 4, set 7 11, set 6 3, 
+     set 5 10, set 4 2, set 3 9, set 2 1, set 1 8, set 0 0, LDCTIB
+    
+_single_pair_loop:
+# 2 bundles
+     set 17..2 o15..o0, set 18..23 L, set 31..25 o30..o24, LDCTIAL
+     set 24 24+a, set 0..15 o0..o15, set 31..25 o31..o25, loopb 7 1 _single_pair_loop 
+_pixel_exit:
+# 1 bundle     
+     set 0..7 o24..o31, write 8, read 32, jmp _start_interleave_preparation
+
+#################################################################################################
+# example is codded using blue and green channels within RGBA8888 as 8 bit inputs
+# alpha channel in lower 4 bits contains FUNCTION ID for bitwise opperation
+# so it allows each pixel has different bitwise operation depending on content in alpha channel 
+# It is full computational-based and it does not use any LUT ram location
+
+# RFE to Espressif:
+##################################
+# This demonstration is based on indexed addresing mode capabilities of COUNTER A 
+# and as such requires 8 cycles to process all 8 bit pairs consuming total of 18 per function per pixel
+# That can be avoided and make all thing runs within 2 cycles only if COUNTER A 
+# would have partition capabilities. 
+
+# So far COUNTER A can be assumed as a single partitioned with 16 bits (that is current behavior in indexing
+# already implemented in bitscrambler)
+# The following partitions of COUNTER A would make some extremely usefull things performed ultra fast:
+
+# - partition 2x8 bits (that exist in the form of AH and AL but can not be used in such fom in indexing. Anyway the size of 
+#   input range is only 64 bits so this kind of partitiong can be usefull only in LUT addressing, for example
+#   treating whole LUT table as array of bits 8K size in length where each bit in block of 256 bits 
+#   would be accessible by indexing table_offset+L[a0..a7] or table_offset+L[a8..a15]) or in simpler writting table_offset+L[AH] or yable_offset+L[AL] where L is lookup table block of 256 bits
+
+# - partition 4x4 bits extremely useful since ofsets of 4 small partitions are in range 0-15 alowing different kind of selection in dynamic per-pixel different configurations  
+
+# - partition 5x3 bits (doesn't matter it doesnt fit perfectly into 16 bits counter width, this kind of partitioning would allow "3-inputs" logic making
+#   bitwise opperation among 3 input channels at once ie RGB data. Since truth tables of 3 inputs states contain 8 bit result, it means 256 unique tables
+#   offering different kind of operations among 3 channels "dictated" by 8 bit function ID within single channel ie. alpha). Off course, those tables are imaginary
+#   since the ID of the table is already the carrier of all results that table can return 
+
+# - partition 8x2 bits (the most wanted !!!!) with such partition, the above working example could be performed in 2 clocks (instead of 18, exactly 9 times faster) like this
+
+#    _start:
+#    // the first bundle clock, here we do not need COUNTER B for pair counting, but directly load 16 bit interleaved pairs in COUNTER A
+#    set 16..31 L, set 15 15, set 14 7, set 13 14, set 12 6, set 11 13, set 10 5, set 9 12, set 8 4, set 7 11, set 6 3, 
+#    set 5 10, set 4 2, set 3 9, set 2 1, set 1 8, set 0 0, LDCTIA
+#    // the second (the last) bundle clock processing all 8 pairs in single cycle  
+#    set 0 24+[a0..a1], set 1 24+[a2..a3], set 2 24+[a4..a5], set 3 24+[a6..a7], set 4 24+[a8..a9], set 5 24+[a10..a11], 
+#    set 6 24+[a12..a13], set 7 24+[a14..a15], write 8, read 32, jmp _start   
+
+#   Since all bit-pairs use the same FUNCTION ID, all have the same starting address (24 in this case where alpha is used to hold function ID)
+#   but each independent pair needs its own 2 bit "counter" so it can properly DEMUX 4 bit functional result, so partitioning COUNTER A in 
+#   2 bit chunks each carring value in range 0 to 3 perfectly solve whole 8 bits within single cycle 
+
+# - partition 16x1 bits also extremly useful. For that setup we can process various filters among stacks of masks encoded in each channel
+#   this mode also supports for processing of channels containing 16 bit data ie RGB565, or any other 16 bit gradients whee two such shannels
+#   can be processed with dynamic "selectors - demux 2 to 1" among two 16 bits layers. Extremely useful in combination with PPA where 
+#   through event handler callbacks bitscrambler and PPA can be chained for automatic processing completelly performed offload from main 
+#   core-V processors   
+
+# Simialrly as LUT organization scheme is stored in cfg register, partition setup of COUNTER A can be stored too, in new cfg fields
+# so started bitscrambler program strictly uses COUNTER A partitions as defined by cfg. That way reduction of logic on wires required
+# to support partitional indexed offsets can be achieved, as, once partition defined for COUNTER A for some bitscrambler program, it becomes
+# permanent during its execution and can not be changed within its execution. Suggested partition schemes (all as single list):
+
+#  1 x 16 bits current behavior, already implemented, so it can be default partition state on COUNTER A
+#  2 x 8 bits  (useful for luts direct bit access from two separated regions each 256 bits in length)
+#  4 x 4 bits  (useful for both LUT and function IDs of 16 bits length - logic functions with 4 wires inputs)
+#  5 x 3 bits  (no matter its not perfectly aligned to 16 bits width of counter it is still usefull for functions with 3 inputs)
+#  8 x 2 bits  (the most wanted as it covers bitwise opperations among single byte channel data based on function contained within 3rd channel)
+# 16 x 1 bits  (extremely useful in chainning bitscrambler with PPA as layer/mask/color/plane  filter/selector)
+
+# The last two modes would unleash tremendous potential of bare silicon for advanced graphic
+# but the size of detail description of that scope overreaches the size of this RFE
+# and will be posted as another RFE related to PPA
+
+# I am available for contact for any additional information 
+# this is my private email address: srdjan.crnjanski@gmail.com
