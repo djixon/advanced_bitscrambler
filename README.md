@@ -5,7 +5,7 @@ This component for esp32p4 is created mainly as a RFE to Espressif and necessary
 
 For better understanding of the STATE paradigm, here is detailed explanation:
 
-https://drive.google.com/file/d/1AKL6803X-X7vca3wQiHR9chXjXsqHdxL/view?usp=drive_link
+https://drive.google.com/file/d/17HK7v8cUjB2sT12V5Nw04TQn36mi0csI/view?usp=drive_link
 
 Demo application using existing implementation is included with component and detailed explanation in .bsasm file  
 
