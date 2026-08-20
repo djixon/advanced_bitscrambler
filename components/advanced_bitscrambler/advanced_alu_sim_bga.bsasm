@@ -37,10 +37,10 @@ _pixel_exit:
 # already implemented in bitscrambler)
 # The following partitions of COUNTER A would make some extremely usefull things performed ultra fast:
 
-# - partition 2x8 bits (that exist in the form of AH and AL but can not be used in such fom in indexing. Anyway the size of 
+# - partition 2x8 bits (that exist in the form of AH and AL but can not be used in such form in indexing. Anyway the size of 
 #   input range is only 64 bits so this kind of partitiong can be usefull only in LUT addressing, for example
 #   treating whole LUT table as array of bits 8K size in length where each bit in block of 256 bits 
-#   would be accessible by indexing table_offset+L[a0..a7] or table_offset+L[a8..a15]) or in simpler writting table_offset+L[AH] or yable_offset+L[AL] where L is lookup table block of 256 bits
+#   would be accessible by indexing table_offset+L[a0..a7] or table_offset+L[a8..a15]) or in simpler writting table_offset+L[AH] or table_offset+L[AL] where L is lookup table block of 256 bits
 
 # - partition 4x4 bits extremely useful since ofsets of 4 small partitions are in range 0-15 alowing different kind of selection in dynamic per-pixel different configurations  
 
@@ -60,7 +60,7 @@ _pixel_exit:
 #    set 6 24+[a12..a13], set 7 24+[a14..a15], write 8, read 32, jmp _start   
 
 #   Since all bit-pairs use the same FUNCTION ID, all have the same starting address (24 in this case where alpha is used to hold function ID)
-#   but each independent pair needs its own 2 bit "counter" so it can properly DEMUX 4 bit functional result, so partitioning COUNTER A in 
+#   but each independent pair needs its own 2 bit "counter" for indexing so it can properly MUX 4 bit functional result, so partitioning COUNTER A in 
 #   2 bit chunks each carring value in range 0 to 3 perfectly solve whole 8 bits within single cycle 
 
 # - partition 16x1 bits also extremly useful. For that setup we can process various filters among stacks of masks encoded in each channel
